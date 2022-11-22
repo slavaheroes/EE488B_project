@@ -1,0 +1,45 @@
+exp_name: face_baseline
+desription: baseline
+resume: False
+seed: 42
+epochs: 1
+test_list: data/val_pairs.csv
+test_path: data/val
+
+loss:
+  nClasses: 2000
+  nOut: 1024
+
+model:
+  name: resnet34
+  embed_dim: 1024
+
+dataloader:
+  batch_size: 16 # Batch size, number of classes per batch
+  max_img_per_cls: 500 # Maximum number of images per class per epoch
+  nDataLoaderThread: 5 # Number of loader threads
+  nPerClass: 2 # Number of images per class per batch, only for metric learning based losses
+  train_path: data/train # path to the train set
+  train_ext: jpg # Training files extension
+
+trainer:
+  lr_step: epoch
+  mixedprec: False # Enable mixed precision training
+  gpu: cuda:1
+
+OPTIMIZER:
+  PY: torch.optim
+  CLASS: AdamW
+  ARGS:
+    lr: 0.001
+    weight_decay: 0.000005
+
+SCHEDULER:
+  PY: torch.optim.lr_scheduler
+  CLASS: StepLR
+  ARGS:
+    step_size: 5
+    gamma: 0.90
+    verbose: True
+  
+

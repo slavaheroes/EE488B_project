@@ -1,3 +1,11 @@
+data/train
+data/val
+data/*.zip
+data/*csv
+.vscode
+vgg_data/
+logs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
