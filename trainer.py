@@ -4,6 +4,9 @@ from tqdm import tqdm
 import os
 import utils
 from loguru import logger
+import torch.nn.functional as F
+import numpy, math, pdb, sys
+import pandas as pd
 
 class ModelTrainer:
     def __init__(self, 
@@ -69,11 +72,13 @@ class ModelTrainer:
                 index   += stepsize
 
                 tepoch.set_postfix(loss=loss/counter)
-                if self.lr_step == 'iteration': self.scheduler.step()
+                if self.lr_step == 'iteration':
+                    self.scheduler.step()
             
-            if self.lr_step == 'epoch': self.scheduler.step()
+            if self.lr_step == 'epoch':
+                self.scheduler.step()
     
-        return (loss/counter)
+        return loss/counter
 
     def val_epoch(self, epoch, test_loader, test_list):
         ## Read all lines
@@ -126,21 +131,20 @@ class ModelTrainer:
             logger.info(f'Training loss {train_loss}')
 
             sc, lab, trials = self.val_epoch(epoch, self.dataloaders['val'], self.config['test_list'])
-            result = utils.tuneThresholdfromScore(sc, lab, [1, 0.1])
+            tunedThreshold, eer, fpr, fnr = utils.tuneThresholdfromScore(sc, lab, [1, 0.1])
 
-            epoch_metrics['val_loss'] = None
-            epoch_metrics['val_eer'] = result
+            epoch_metrics['val_eer'] = eer
+            epoch_metrics['threshold'] = tunedThreshold
 
-            if result < best_score:
-                best_score = result
+            if eer < best_score:
+                best_score = eer
                 self.model.cpu()
                 torch.save({
                     "epoch": epoch + 1,
                     "state_dict": self.model.state_dict(),
                 }, os.path.join(self.logdir, "best_model.pth"))
             
-            logger.info(f'Validation loss {val_loss}')
-            logger.info(f'Val EER {result}')
+            logger.info(f'Val EER {eer}')
 
             logging_csv.append(epoch_metrics)
             pd.DataFrame(logging_csv).to_csv(self.history_csv, index = None)

@@ -2,21 +2,21 @@ exp_name: face_baseline
 desription: baseline
 resume: False
 seed: 42
-epochs: 1
+epochs: 50
 test_list: data/val_pairs.csv
 test_path: data/val
 
 loss:
   nClasses: 2000
-  nOut: 1024
+  nOut: 768
   nPerClass: 1
 
 model:
-  name: vit_tiny_patch16_224
-  embed_dim: 1024
+  name: resnet26
+  embed_dim: 768
 
 dataloader:
-  batch_size: 16 # Batch size, number of classes per batch
+  batch_size: 100
   max_img_per_cls: 500 # Maximum number of images per class per epoch
   nDataLoaderThread: 5 # Number of loader threads
   nPerClass: 1 # Number of images per class per batch, only for metric learning based losses

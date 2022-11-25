@@ -10,6 +10,7 @@ import glob
 import os
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
+import pandas as pd
 
 def round_down(num, divisor):
     return num - (num%divisor)
@@ -144,3 +145,20 @@ def get_data_loader(batch_size, max_img_per_cls, nDataLoaderThread, nPerClass, t
     )
     
     return train_loader
+
+class VGG_dataset:
+    def __init__(self,
+                path,
+                transform):
+        
+        self.items = pd.read_csv(path).to_dict('records')
+        self.transform = transform
+    
+    def __len__(self):
+        return len(self.items)
+    
+    def __getitem__(self, idx):
+        img_path = self.items[idx]['img_path']
+        image = Image.open(img_path)
+        image = self.transform(image)
+        return image, self.items[idx]['label']
