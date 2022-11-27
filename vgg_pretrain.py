@@ -29,7 +29,7 @@ def train(model, loss_func, mining_func, loader, optimizer):
             counter += 1
             tepoch.set_postfix(loss=loss/counter)
 
-    return loss/counter
+    return loss
 
 def main():
     parser = ArgumentParser()
@@ -71,7 +71,7 @@ def main():
         margin=0.4, distance=distance, type_of_triplets="semihard"
     )
 
-    num_epochs = 10
+    num_epochs = 2
     model.to("cuda:1")
     for epoch in range(1, num_epochs + 1):
         logger.info(f'Start of {epoch}/{num_epochs}')
@@ -85,7 +85,7 @@ def main():
         "epoch": epoch,
         "optimizer_state_dict": optimizer.state_dict(),
         "state_dict": model.state_dict(),
-    }, os.path.join("../logs/", "best_pretrained_model.pth"))
+    }, os.path.join("./logs/", "best_pretrained_model.pth"))
     logger.info('Training is finished')
 
 

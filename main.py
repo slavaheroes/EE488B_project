@@ -4,11 +4,11 @@ from argparse import ArgumentParser
 import os
 import importlib
 from loguru import logger
-from DatasetLoader import get_data_loader, test_dataset_loader
+from DatasetLoader import get_data_loader, test_dataset_loader, meta_loader
 import torchvision.transforms as transforms
 from models.EmbedNet import EmbedNet
-from losses import LossFunction
 import torch
+import torchvision
 
 from trainer import ModelTrainer
 
@@ -16,34 +16,19 @@ def init_dataloaders(config):
     train_transform = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Resize((224, 224)),
+            transforms.RandomHorizontalFlip(p=0.5),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-    ## Input transformations for evaluation
-    test_transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Resize((224, 224)),
-         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-
     ## Initialise trainer and data loader
-    trainLoader = get_data_loader(transform=train_transform, **config['dataloader'])
+    train_dataset = torchvision.datasets.ImageFolder(root=config['dataloader']['train_path'], transform=train_transform)
+    trainLoader = torch.utils.data.DataLoader(train_dataset,\
+        batch_size = config['dataloader']['batch_size'],\
+            num_workers = config['dataloader']['nDataLoaderThread'],
+            shuffle = True)
+    
+    # trainLoader = get_data_loader(transform=train_transform, **config['dataloader'])
 
-    ## Read all lines
-    with open(config['test_list']) as f:
-        lines = f.readlines()
-    files = sum([x.strip().split(',')[-2:] for x in lines],[])
-    setfiles = list(set(files))
-    setfiles.sort()
-
-    test_dataset = test_dataset_loader(setfiles, config['test_path'], transform=test_transform)
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset,
-        batch_size=1,
-        shuffle=False,
-        num_workers=5,
-        drop_last=False,
-    )
-
-    return {'train': trainLoader, 'val': test_loader}
+    return {'train': trainLoader}
 
 def main():
     parser = ArgumentParser()
@@ -58,11 +43,12 @@ def main():
     
     logger.info("dataloader are loaded")
 
-    criterion = LossFunction(**config['loss'])
-    model = EmbedNet(config, criterion)
+    model = EmbedNet(config)
 
     if config["resume"]:
-        # load prev weights
+        # load prev or pretrained weights
+        state_dict = torch.load(config['resume_path'])['state_dict']
+        model.load_state_dict(state_dict)
         logger.info(f'Model weights are loaded')
 
     pytorch_total_params = sum(p.numel() for p in model.parameters())

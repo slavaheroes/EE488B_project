@@ -5,6 +5,7 @@ data/*csv
 .vscode
 vgg_data/
 logs/
+playground.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

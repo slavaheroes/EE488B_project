@@ -6,14 +6,17 @@ epochs: 50
 test_list: data/val_pairs.csv
 test_path: data/val
 
+resume: False
+resume_path: logs/best_pretrained_model.pth
+
 loss:
-  nClasses: 2000
-  nOut: 768
+  nClasses: 1230
+  nOut: 512
   nPerClass: 1
 
 model:
-  name: resnet26
-  embed_dim: 768
+  name: resnet18
+  embed_dim: 512
 
 dataloader:
   batch_size: 100
@@ -33,14 +36,13 @@ OPTIMIZER:
   CLASS: AdamW
   ARGS:
     lr: 0.001
-    weight_decay: 0.000005
+    weight_decay: 0.00005
 
 SCHEDULER:
   PY: torch.optim.lr_scheduler
-  CLASS: StepLR
+  CLASS: ExponentialLR
   ARGS:
-    step_size: 5
-    gamma: 0.90
+    gamma: 0.9
     verbose: True
   
 
