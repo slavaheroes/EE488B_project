@@ -1,20 +1,20 @@
-exp_name: resnet26
-desription: resnet26 with the arc_face
+exp_name: resnet26_triplet
+desription: resnet26
 seed: 42
 gpu: 1
-max_epoch: 2
+max_epoch: 10
 
 loss:
-  name: combo_loss
+  name: triplet
   params:
-    nClasses: 1230
-    nOut: 768
+    nClasses: 8631
+    nOut: 512
     nPerClass: 1
     margin: 0.2
 
 model:
   name: resnet26
-  embed_dim: 768
+  embed_dim: 512
 
 trainer:
   lr_step: epoch
@@ -33,9 +33,9 @@ trainer:
       verbose: True
 
 dataloader:
-  batch_size: 100
-  max_img_per_cls: 10 # Maximum number of images per class per epoch
+  batch_size: 50
+  max_img_per_cls: 20 # Maximum number of images per class per epoch
   nDataLoaderThread: 5 # Number of loader threads
-  nPerClass: 1 # Number of images per class per batch, only for metric learning based losses
+  nPerClass: 2 # Number of images per class per batch, only for metric learning based losses
   train_path: vgg_data/train # path to the train set
   train_ext: jpg # Training files extension

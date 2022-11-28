@@ -24,18 +24,12 @@ class EmbedNet(nn.Module):
         LossFunction = importlib.import_module('loss.'+config['loss']['name']).__getattribute__('LossFunction')
         self.__L__ = LossFunction(**config['loss']['params']);
 
-        ## Number of examples per identity per batch
-        self.nPerClass = config['dataloader']['nPerClass']
-
     def forward(self, data, label=None):
-
         data    = data.reshape(-1,data.size()[-3],data.size()[-2],data.size()[-1])
         outp    = self.__S__.forward(data)
-
         if label == None:
             return outp
-
         else:
-            outp    = outp.reshape(self.nPerClass,-1,outp.size()[-1]).transpose(1,0).squeeze(1)
+            label   = label.view(-1)
             nloss = self.__L__.forward(outp,label)
             return nloss

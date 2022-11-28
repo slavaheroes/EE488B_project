@@ -1,7 +1,7 @@
-exp_name: resnet26
-desription: resnet26 with the arc_face
+exp_name: resnet26_combo
+desription: resnet26 without pretraining
 seed: 42
-gpu: 1
+gpu: 0
 max_epoch: 50
 save_path: logs
 initial_model: ""
@@ -19,19 +19,20 @@ loss:
   name: combo_loss
   params:
     nClasses: 1230
-    nOut: 768
+    nOut: 512
     nPerClass: 1
-    margin: 0.2
+    margin: 0.3
+    mining_margin: 0.4
 
 model:
   name: resnet26
-  embed_dim: 768
+  embed_dim: 512
 
 dataloader:
-  batch_size: 100
-  max_img_per_cls: 10 # Maximum number of images per class per epoch
+  batch_size: 50
+  max_img_per_cls: 100 # Maximum number of images per class per epoch
   nDataLoaderThread: 5 # Number of loader threads
-  nPerClass: 1 # Number of images per class per batch, only for metric learning based losses
+  nPerClass: 2 # Number of images per class per batch, only for metric learning based losses
   train_path: data/train # path to the train set
   train_ext: jpg # Training files extension
 
@@ -42,13 +43,15 @@ trainer:
     module: torch.optim
     class: AdamW
     args:
-      lr: 0.001
+      lr: 0.005
       weight_decay: 0.00005
   scheduler:
     module: torch.optim.lr_scheduler
-    class: ExponentialLR
+    class: CosineAnnealingWarmRestarts
     args:
-      gamma: 0.9
+      T_0: 10
+      T_mult: 1 
+      eta_min: 0.0001
       verbose: True
   
 

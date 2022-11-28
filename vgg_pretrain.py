@@ -23,11 +23,11 @@ def get_all_embeddings(dataset, model):
 def test(train_set, test_set, model, accuracy_calculator):
     train_embeddings, train_labels = get_all_embeddings(train_set, model)
     test_embeddings, test_labels = get_all_embeddings(test_set, model)
-    train_labels = train_labels.squeeze(1)
-    test_labels = test_labels.squeeze(1)
+    train_labels = train_labels.squeeze(1).cpu()
+    test_labels = test_labels.squeeze(1).cpu()
     print("Computing accuracy")
     accuracies = accuracy_calculator.get_accuracy(
-        test_embeddings, train_embeddings, test_labels, train_labels, False
+        test_embeddings.cpu(), train_embeddings.cpu(), test_labels, train_labels, False
     )
     print("Test set accuracy (Precision@1) = {}".format(accuracies["precision_at_1"]))
     return accuracies["precision_at_1"]
@@ -59,8 +59,8 @@ def main():
          transforms.CenterCrop([224,224]),
          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
     
-    train_dataset = VGG_dataset("./vgg_data/train.csv", train_transform, size = 0.05)
-    valid_dataset = VGG_dataset("./vgg_data/valid.csv", test_transform, size = 0.02)
+    train_dataset = VGG_dataset("./vgg_data/train.csv", train_transform, size = 0.10)
+    valid_dataset = VGG_dataset("./vgg_data/valid.csv", test_transform, size = 0.10)
 
     logger.info(f'Size of train {len(train_dataset)}, Size of valid {len(valid_dataset)}')
     
@@ -81,6 +81,7 @@ def main():
 
         test_acc = test(train_dataset, valid_dataset, model, accuracy_calculator)
         if test_acc > best_test_acc:
+            best_test_acc = test_acc
             trainer.saveParameters("./logs/best_pretrained_model.model");
 
         logger.info(f'End of {epoch}/{num_epochs}')

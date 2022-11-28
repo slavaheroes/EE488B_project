@@ -52,11 +52,14 @@ class meta_loader(Dataset):
     def __getitem__(self, indices):
 
         feat = []
+        labels = []
         for index in indices:
             feat.append(self.transform(Image.open(self.data_list[index])));
+            labels.append(self.data_label[index])
+            
         feat = numpy.stack(feat, axis=0)
-
-        return torch.FloatTensor(feat), self.data_label[index]
+        labels = numpy.stack(labels, axis=0)
+        return torch.FloatTensor(feat), labels
 
     def __len__(self):
 
