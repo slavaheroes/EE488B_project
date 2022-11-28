@@ -2,18 +2,7 @@ exp_name: resnet26
 desription: resnet26 with the arc_face
 seed: 42
 gpu: 1
-max_epoch: 50
-save_path: logs
-initial_model: ""
-test_interval: 1
-
-eval: False
-evaluate:
-  test_list: data/val_pairs.csv
-  test_path: data/val
-  nDataLoaderThread: 5
-
-resume: False
+max_epoch: 2
 
 loss:
   name: combo_loss
@@ -26,14 +15,6 @@ loss:
 model:
   name: resnet26
   embed_dim: 768
-
-dataloader:
-  batch_size: 100
-  max_img_per_cls: 10 # Maximum number of images per class per epoch
-  nDataLoaderThread: 5 # Number of loader threads
-  nPerClass: 1 # Number of images per class per batch, only for metric learning based losses
-  train_path: data/train # path to the train set
-  train_ext: jpg # Training files extension
 
 trainer:
   lr_step: epoch
@@ -50,5 +31,11 @@ trainer:
     args:
       gamma: 0.9
       verbose: True
-  
 
+dataloader:
+  batch_size: 100
+  max_img_per_cls: 10 # Maximum number of images per class per epoch
+  nDataLoaderThread: 5 # Number of loader threads
+  nPerClass: 1 # Number of images per class per batch, only for metric learning based losses
+  train_path: vgg_data/train # path to the train set
+  train_ext: jpg # Training files extension

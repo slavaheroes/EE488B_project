@@ -2,91 +2,90 @@ import utils
 from argparse import ArgumentParser
 from DatasetLoader import VGG_dataset
 import torchvision.transforms as transforms
-from models.EmbedNet import EmbedNet
-import torch.optim as optim
-from tqdm import tqdm
+from EmbedNet import EmbedNet
+from trainer import ModelTrainer
 from loguru import logger
 import timm
 import os
+from DatasetLoader import get_data_loader
 
 from pytorch_metric_learning import distances, losses, miners, reducers, testers
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 import torch
 
-def train(model, loss_func, mining_func, loader, optimizer):
-    loss = 0
-    counter = 0
-    with tqdm(loader, unit="batch") as tepoch:
-        for data, labels in tepoch:
-            data, labels = data.to("cuda:1"), labels.to("cuda:1")
-            optimizer.zero_grad()
-            embeddings = model(data)
-            indices_tuple = mining_func(embeddings, labels)
-            loss = loss_func(embeddings, labels, indices_tuple)
-            loss.backward()
-            optimizer.step()
-            loss    += loss.detach().cpu().item()
-            counter += 1
-            tepoch.set_postfix(loss=loss/counter)
 
-    return loss
+def get_all_embeddings(dataset, model):
+    tester = testers.BaseTester()
+    return tester.get_all_embeddings(dataset, model)
+
+
+### compute accuracy using AccuracyCalculator from pytorch-metric-learning ###
+def test(train_set, test_set, model, accuracy_calculator):
+    train_embeddings, train_labels = get_all_embeddings(train_set, model)
+    test_embeddings, test_labels = get_all_embeddings(test_set, model)
+    train_labels = train_labels.squeeze(1)
+    test_labels = test_labels.squeeze(1)
+    print("Computing accuracy")
+    accuracies = accuracy_calculator.get_accuracy(
+        test_embeddings, train_embeddings, test_labels, train_labels, False
+    )
+    print("Test set accuracy (Precision@1) = {}".format(accuracies["precision_at_1"]))
+    return accuracies["precision_at_1"]
+
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("--experiment_cfg",
-                        default="./experiments/baseline.yaml", type=str)
+                        default="./experiments/vgg_baseline.yaml", type=str)
     args = parser.parse_args()
 
     config = utils.load_yaml(args.experiment_cfg)
     utils.seed_everything(config["seed"])
+
+    os.environ["CUDA_VISIBLE_DEVICES"]='{}'.format(config['gpu'])
     
     # ------ DATASET -------
     train_transform = transforms.Compose(
-            [transforms.ToTensor(),
-            transforms.Resize((224, 224)),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
-    )
+        [transforms.ToTensor(),
+         transforms.Resize(256),
+         transforms.RandomCrop([224,224]),
+         transforms.RandomHorizontalFlip(p = 0.3),
+         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
+    ## Input transformations for evaluation
     test_transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Resize((224, 224)),
+         transforms.Resize(256),
+         transforms.CenterCrop([224,224]),
          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
     
-    train_dataset = VGG_dataset("./vgg_data/train.csv", train_transform)
+    train_dataset = VGG_dataset("./vgg_data/train.csv", train_transform, size = 0.05)
+    valid_dataset = VGG_dataset("./vgg_data/valid.csv", test_transform, size = 0.02)
 
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=100, num_workers=5
-    )
+    logger.info(f'Size of train {len(train_dataset)}, Size of valid {len(valid_dataset)}')
+    
+    trainLoader = get_data_loader(transform=train_transform, **config['dataloader']);
 
-    model = EmbedNet(config)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    model = EmbedNet(config).cuda()
+    trainer     = ModelTrainer(model, **config['trainer'])
 
-    ### pytorch-metric-learning stuff ###
-    distance = distances.CosineSimilarity()
-    reducer = reducers.ThresholdReducer(low=0)
-    loss_func = losses.TripletMarginLoss(margin=0.4, distance=distance, reducer=reducer)
-    mining_func = miners.TripletMarginMiner(
-        margin=0.4, distance=distance, type_of_triplets="semihard"
-    )
+    num_epochs = config['max_epoch']
 
-    num_epochs = 2
-    model.to("cuda:1")
+    accuracy_calculator = AccuracyCalculator(include=("precision_at_1",), k=1)
+
+    best_test_acc = 0.0
     for epoch in range(1, num_epochs + 1):
         logger.info(f'Start of {epoch}/{num_epochs}')
-        train_loss = train(model, loss_func, mining_func, train_loader, optimizer)
-        scheduler.step()
+        train_loss = trainer.train_network(trainLoader)
         logger.info(f'Train loss {train_loss}')
+
+        test_acc = test(train_dataset, valid_dataset, model, accuracy_calculator)
+        if test_acc > best_test_acc:
+            trainer.saveParameters("./logs/best_pretrained_model.model");
+
         logger.info(f'End of {epoch}/{num_epochs}')
-        
-    model.cpu()
-    torch.save({
-        "epoch": epoch,
-        "optimizer_state_dict": optimizer.state_dict(),
-        "state_dict": model.state_dict(),
-    }, os.path.join("./logs/", "best_pretrained_model.pth"))
-    logger.info('Training is finished')
+    
+    logger.info(f'Training is finished with best testing accuracy {best_test_acc}')
 
 
 if __name__ == "__main__":

@@ -149,9 +149,11 @@ def get_data_loader(batch_size, max_img_per_cls, nDataLoaderThread, nPerClass, t
 class VGG_dataset:
     def __init__(self,
                 path,
-                transform):
+                transform,
+                size = 1.0):
         
         self.items = pd.read_csv(path).to_dict('records')
+        self.items = self.items[:int(size*len(self.items))]
         self.transform = transform
     
     def __len__(self):

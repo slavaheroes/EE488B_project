@@ -1,34 +1,23 @@
-import pandas as pd
-import utils
-from argparse import ArgumentParser
+#!/usr/bin/python
+#-*- coding: utf-8 -*-
+
+import sys
+import time
 import os
-import importlib
-from loguru import logger
-from DatasetLoader import get_data_loader, test_dataset_loader, meta_loader
-import torchvision.transforms as transforms
-from models.EmbedNet import EmbedNet
-import torch
-import torchvision
-
+from argparse import ArgumentParser
+import pdb
+import glob
+import datetime
+from utils import *
+import utils
 from trainer import ModelTrainer
+from EmbedNet import EmbedNet
+from DatasetLoader import get_data_loader
+import torchvision.transforms as transforms
 
-def init_dataloaders(config):
-    train_transform = transforms.Compose(
-            [transforms.ToTensor(),
-            transforms.Resize((224, 224)),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-
-    ## Initialise trainer and data loader
-    train_dataset = torchvision.datasets.ImageFolder(root=config['dataloader']['train_path'], transform=train_transform)
-    trainLoader = torch.utils.data.DataLoader(train_dataset,\
-        batch_size = config['dataloader']['batch_size'],\
-            num_workers = config['dataloader']['nDataLoaderThread'],
-            shuffle = True)
-    
-    # trainLoader = get_data_loader(transform=train_transform, **config['dataloader'])
-
-    return {'train': trainLoader}
+# ## ===== ===== ===== ===== ===== ===== ===== =====
+# ## Main function
+# ## ===== ===== ===== ===== ===== ===== ===== =====
 
 def main():
     parser = ArgumentParser()
@@ -39,41 +28,111 @@ def main():
     config = utils.load_yaml(args.experiment_cfg)
     utils.seed_everything(config["seed"])
 
-    dataloaders = init_dataloaders(config)
+    os.environ["CUDA_VISIBLE_DEVICES"]='{}'.format(config['gpu'])
+
+    ## Load models
+    s = EmbedNet(config).cuda();
+
+    it          = 1
+
+    ## Input transformations for training
+    train_transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Resize(256),
+         transforms.RandomCrop([224,224]),
+         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+
+    ## Input transformations for evaluation
+    test_transform = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Resize(256),
+         transforms.CenterCrop([224,224]),
+         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+
+    ## Initialise trainer and data loader
+    trainLoader = get_data_loader(transform=train_transform, **config['dataloader']);
+    trainer     = ModelTrainer(s, **config['trainer'])
+
+    config['save_path'] = config['save_path'] + f'/{config["exp_name"]}'
+    os.makedirs(config['save_path'], exist_ok = True)
+    ## Load model weights
+    modelfiles = glob.glob('{}/model0*.model'.format(config['save_path']))
+    modelfiles.sort()
+
+    ## If the target directory already exists, start from the existing file
+    if len(modelfiles) >= 1 and config['resume']:
+        trainer.loadParameters(modelfiles[-1]);
+        print("Model {} loaded from previous state!".format(modelfiles[-1]));
+        it = int(os.path.splitext(os.path.basename(modelfiles[-1]))[0][5:]) + 1
+
+    if(config["initial_model"] != ""):
+        trainer.loadParameters(config["initial_model"]);
+        print("Model {} loaded!".format(config["initial_model"]));
     
-    logger.info("dataloader are loaded")
+    ## If the current iteration is not 1, update the scheduler
+    for ii in range(1,it):
+        trainer.__scheduler__.step()
 
-    model = EmbedNet(config)
+    ## Print total number of model parameters
+    pytorch_total_params = sum(p.numel() for p in s.__S__.parameters())
+    print('Total model parameters: {:,}'.format(pytorch_total_params))
 
-    if config["resume"]:
-        # load prev or pretrained weights
-        state_dict = torch.load(config['resume_path'])['state_dict']
-        model.load_state_dict(state_dict)
-        logger.info(f'Model weights are loaded')
+     ## Evaluation code 
+    if config["eval"] == True:
 
-    pytorch_total_params = sum(p.numel() for p in model.parameters())
-    logger.info(f'Total number of parameters: {pytorch_total_params}')
+        sc, lab, trials = trainer.evaluateFromList(transform=test_transform, **config["evaluate"])
+        result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
+
+        print('EER {:.4f}'.format(result[1]))
+
+        if config['output'] != '':
+            with open(config['output'],'w') as f:
+                for ii in range(len(sc)):
+                    f.write('{:4f},{:d},{}\n'.format(sc[ii],lab[ii],trials[ii]))
+
+        quit();
     
-    module = importlib.import_module(config["OPTIMIZER"]["PY"])
-    optimizer = getattr(module, config["OPTIMIZER"]["CLASS"])(
-        model.parameters(), **config["OPTIMIZER"]["ARGS"])
+    ## Write config to scorefile for training
+    scorefile = open(config['save_path']+"/scores.txt", "a+");
 
-    module = importlib.import_module(config["SCHEDULER"]["PY"])
-    scheduler = getattr(module, config["SCHEDULER"]["CLASS"])(
-        optimizer, **config["SCHEDULER"]["ARGS"])
-    
-    logger.info("hyperparameters are loaded")
+    strtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    scorefile.write('{}\n'.format(strtime))
+    utils.save_yaml(config, config['save_path']+"/config.yaml")
+    scorefile.flush()
 
-    learner = ModelTrainer(
-        model = model,
-        dataloaders = dataloaders,
-        optimizer = optimizer,
-        scheduler = scheduler,
-        config = config,
-        **config['trainer']
-    )
+    ## Core training script
+    minimal_eer = 100
+    for it in range(it,config["max_epoch"]+1):
 
-    learner.fit()
+        clr = [x['lr'] for x in trainer.__optimizer__.param_groups]
+
+        print(time.strftime("%Y-%m-%d %H:%M:%S"), it, "Training epoch {:d} with LR {:.5f} ".format(it,max(clr)));
+
+        loss = trainer.train_network(trainLoader);
+
+        if it % config["test_interval"] == 0:
+            
+            sc, lab, trials = trainer.evaluateFromList(transform=test_transform, **config["evaluate"])
+            result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
+
+            print("IT {:d}, Val EER {:.5f}".format(it, result[1]));
+            scorefile.write("IT {:d}, Val EER {:.5f}\n".format(it, result[1]));
+
+            if result[1] < minimal_eer:
+                trainer.saveParameters(config['save_path']+"/best_model.model");
+                minimal_eer = result[1]
+
+        print(time.strftime("%Y-%m-%d %H:%M:%S"), "TLOSS {:.5f}".format(loss));
+        scorefile.write("IT {:d}, TLOSS {:.5f}\n".format(it, loss));
+
+        scorefile.flush()
+    else:
+        trainer.saveParameters(config['save_path']+"/last_epoch_{}.model".format(it));
+
+
+    print("Best score {:.5f}".format(minimal_eer));
+    scorefile.write("Best score is {:.5f}\n".format(minimal_eer));
+    scorefile.close();
 
 
 
