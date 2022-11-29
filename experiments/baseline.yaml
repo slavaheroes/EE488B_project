@@ -1,7 +1,7 @@
-exp_name: resnet26_combo
-desription: resnet26 without pretraining
+exp_name: resnet18_triplet
+desription: resnet18 without pretraining
 seed: 42
-gpu: 0
+gpu: 1
 max_epoch: 50
 save_path: logs
 initial_model: ""
@@ -16,20 +16,22 @@ evaluate:
 resume: False
 
 loss:
-  name: combo_loss
+  name: triplet
   params:
-    nClasses: 1230
+    nClasses: 1230 # for softmax related
     nOut: 512
-    nPerClass: 1
-    margin: 0.3
+    margin: 0.3 # for triplet
     mining_margin: 0.4
+    temperature: 0.1 # for sup contrast
 
 model:
-  name: resnet26
-  embed_dim: 512
+  module: torchvision.models
+  name: resnet18
+  params:
+    num_classes: 512
 
 dataloader:
-  batch_size: 50
+  batch_size: 100
   max_img_per_cls: 100 # Maximum number of images per class per epoch
   nDataLoaderThread: 5 # Number of loader threads
   nPerClass: 2 # Number of images per class per batch, only for metric learning based losses

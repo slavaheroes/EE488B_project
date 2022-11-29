@@ -17,12 +17,14 @@ class EmbedNet(nn.Module):
         super(EmbedNet, self).__init__();
 
         ## __S__ is the embedding model
-        EmbedNetModel = timm.create_model(config['model']['name'], num_classes = config['model']['embed_dim'])
-        self.__S__ = EmbedNetModel
+        EmbedNetModel = importlib.import_module(config['model']['module']).__getattribute__(config['model']['name'])
+        self.__S__ = EmbedNetModel(**config['model']['params'])
 
         ## __L__ is the classifier plus the loss function
         LossFunction = importlib.import_module('loss.'+config['loss']['name']).__getattribute__('LossFunction')
         self.__L__ = LossFunction(**config['loss']['params']);
+
+        self.nPerClass = config['dataloader']['nPerClass']
 
     def forward(self, data, label=None):
         data    = data.reshape(-1,data.size()[-3],data.size()[-2],data.size()[-1])
@@ -30,6 +32,6 @@ class EmbedNet(nn.Module):
         if label == None:
             return outp
         else:
-            label   = label.view(-1)
+            outp    = outp.reshape(self.nPerClass,-1,outp.size()[-1]).transpose(1,0).squeeze(1)
             nloss = self.__L__.forward(outp,label)
             return nloss

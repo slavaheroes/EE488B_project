@@ -38,17 +38,17 @@ def main():
     ## Input transformations for training
     train_transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Resize(256),
-         transforms.RandomCrop([224,224]),
+         transforms.Resize((224, 224)),
+        #  transforms.RandomCrop([224,224]),
          transforms.RandomHorizontalFlip(p=0.3),
-         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+         transforms.Normalize(mean=0.5, std=0.5)])
 
     ## Input transformations for evaluation
     test_transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Resize(256),
-         transforms.CenterCrop([224,224]),
-         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+         transforms.Resize((224, 224)),
+        #  transforms.CenterCrop([224,224]),
+         transforms.Normalize(mean=0.5, std=0.5)])
 
     ## Initialise trainer and data loader
     trainLoader = get_data_loader(transform=train_transform, **config['dataloader']);
@@ -114,8 +114,9 @@ def main():
         if it % config["test_interval"] == 0:
             
             sc, lab, trials = trainer.evaluateFromList(transform=test_transform, **config["evaluate"])
+            print(min(sc), max(sc))
             result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
-
+            
             print("IT {:d}, Val EER {:.5f}".format(it, result[1]));
             scorefile.write("IT {:d}, Val EER {:.5f}\n".format(it, result[1]));
 

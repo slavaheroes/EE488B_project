@@ -59,7 +59,7 @@ class meta_loader(Dataset):
             
         feat = numpy.stack(feat, axis=0)
         labels = numpy.stack(labels, axis=0)
-        return torch.FloatTensor(feat), labels
+        return torch.FloatTensor(feat), self.data_label[index]
 
     def __len__(self):
 
