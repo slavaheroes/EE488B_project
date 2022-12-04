@@ -1,20 +1,25 @@
-exp_name: resnet26_triplet
-desription: resnet26
+exp_name: resnet26
+desription: pretraining on vgg2 dataset
 seed: 42
 gpu: 1
-max_epoch: 10
+max_epoch: 30
+initial_model: ""
 
 loss:
   name: triplet
   params:
-    nClasses: 8631
-    nOut: 512
-    nPerClass: 1
-    margin: 0.2
+    nClasses: 9000 # for softmax related
+    nOut: 1024
+    margin: 0.3 # for triplet
+    mining_margin: 0.4
+    temperature: 0.1 # for sup contrast
 
 model:
-  name: resnet26
-  embed_dim: 512
+  module: timm
+  name: create_model
+  params:
+    model_name: resnet26
+    num_classes: 1024
 
 trainer:
   lr_step: epoch
@@ -34,7 +39,7 @@ trainer:
 
 dataloader:
   batch_size: 50
-  max_img_per_cls: 20 # Maximum number of images per class per epoch
+  max_img_per_cls: 50 # Maximum number of images per class per epoch
   nDataLoaderThread: 5 # Number of loader threads
   nPerClass: 2 # Number of images per class per batch, only for metric learning based losses
   train_path: vgg_data/train # path to the train set

@@ -47,17 +47,17 @@ def main():
     # ------ DATASET -------
     train_transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Resize(256),
-         transforms.RandomCrop([224,224]),
+         transforms.Resize((224, 224)),
          transforms.RandomHorizontalFlip(p = 0.3),
-         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+         transforms.ColorJitter(brightness=(0.5,1.5), contrast=(1), saturation=(0.5,1.5), hue=(-0.1,0.1)),
+         transforms.Normalize(mean=0.5, std=0.5)])
 
     ## Input transformations for evaluation
     test_transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Resize(256),
+         transforms.Resize((224, 224)),
          transforms.CenterCrop([224,224]),
-         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+         transforms.Normalize(mean=0.5, std=0.5)])
     
     train_dataset = VGG_dataset("./vgg_data/train.csv", train_transform, size = 0.10)
     valid_dataset = VGG_dataset("./vgg_data/valid.csv", test_transform, size = 0.10)
@@ -69,23 +69,28 @@ def main():
     model = EmbedNet(config).cuda()
     trainer     = ModelTrainer(model, **config['trainer'])
 
+    if(config["initial_model"] != ""):
+        trainer.loadParameters(config["initial_model"]);
+        print("Model {} loaded!".format(config["initial_model"]));
+
     num_epochs = config['max_epoch']
 
     accuracy_calculator = AccuracyCalculator(include=("precision_at_1",), k=1)
 
-    best_test_acc = 0.0
     for epoch in range(1, num_epochs + 1):
         logger.info(f'Start of {epoch}/{num_epochs}')
         train_loss = trainer.train_network(trainLoader)
         logger.info(f'Train loss {train_loss}')
 
-        test_acc = test(train_dataset, valid_dataset, model, accuracy_calculator)
-        if test_acc > best_test_acc:
-            best_test_acc = test_acc
-            trainer.saveParameters("./logs/best_pretrained_model.model");
+        # test_acc = test(train_dataset, valid_dataset, model, accuracy_calculator)
+        # if test_acc > best_test_acc:
+        #     best_test_acc = test_acc
+            # trainer.saveParameters(f'./logs/best_{config["model"]["name"]}_{config["loss"]["name"]}_pretrained_model.model');
 
         logger.info(f'End of {epoch}/{num_epochs}')
-    
+    best_test_acc = test(train_dataset, valid_dataset, model, accuracy_calculator)
+
+    trainer.saveParameters(f'./logs/best_{config["exp_name"]}_{config["loss"]["name"]}_pretrained_model.model');
     logger.info(f'Training is finished with best testing accuracy {best_test_acc}')
 
 

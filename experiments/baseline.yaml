@@ -1,10 +1,10 @@
-exp_name: resnet18_triplet
-desription: resnet18 without pretraining
+exp_name: resnet26_arccos
+desription: resnet26 with pretraining
 seed: 42
 gpu: 1
-max_epoch: 50
+max_epoch: 100
 save_path: logs
-initial_model: ""
+initial_model: "logs/best_resnet26_triplet_pretrained_model.model"
 test_interval: 1
 
 eval: False
@@ -12,35 +12,37 @@ evaluate:
   test_list: data/val_pairs.csv
   test_path: data/val
   nDataLoaderThread: 5
-
+output: ""
 resume: False
 
 loss:
-  name: triplet
+  name: softmax
   params:
     nClasses: 1230 # for softmax related
     nOut: 512
     margin: 0.3 # for triplet
+    scale: 1
     mining_margin: 0.4
     temperature: 0.1 # for sup contrast
 
 model:
-  module: torchvision.models
-  name: resnet18
+  module: timm
+  name: create_model
   params:
+    model_name: resnet26
     num_classes: 512
 
 dataloader:
-  batch_size: 100
-  max_img_per_cls: 100 # Maximum number of images per class per epoch
+  batch_size: 200
+  max_img_per_cls: 200 # Maximum number of images per class per epoch
   nDataLoaderThread: 5 # Number of loader threads
-  nPerClass: 2 # Number of images per class per batch, only for metric learning based losses
+  nPerClass: 1 # Number of images per class per batch, only for metric learning based losses
   train_path: data/train # path to the train set
   train_ext: jpg # Training files extension
 
 trainer:
   lr_step: epoch
-  mixedprec: False # Enable mixed precision training
+  mixedprec: True # Enable mixed precision training
   optimizer:
     module: torch.optim
     class: AdamW

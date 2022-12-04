@@ -38,9 +38,10 @@ def main():
     ## Input transformations for training
     train_transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Resize((224, 224)),
+         transforms.Resize([224,224]),
         #  transforms.RandomCrop([224,224]),
-         transforms.RandomHorizontalFlip(p=0.3),
+         transforms.RandomHorizontalFlip(p = 0.3),
+         transforms.ColorJitter(brightness=(0.5,1.5), contrast=(1), saturation=(0.5,1.5), hue=(-0.1,0.1)),
          transforms.Normalize(mean=0.5, std=0.5)])
 
     ## Input transformations for evaluation
@@ -57,7 +58,7 @@ def main():
     config['save_path'] = config['save_path'] + f'/{config["exp_name"]}'
     os.makedirs(config['save_path'], exist_ok = True)
     ## Load model weights
-    modelfiles = glob.glob('{}/model0*.model'.format(config['save_path']))
+    modelfiles = glob.glob('{}/*.model'.format(config['save_path']))
     modelfiles.sort()
 
     ## If the target directory already exists, start from the existing file
@@ -80,7 +81,7 @@ def main():
 
      ## Evaluation code 
     if config["eval"] == True:
-
+        s.cpu()
         sc, lab, trials = trainer.evaluateFromList(transform=test_transform, **config["evaluate"])
         result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
 
