@@ -1,27 +1,27 @@
-exp_name: resnet26_arccos
+exp_name: resnet26_triplet
 desription: resnet26 with pretraining
 seed: 42
 gpu: 1
 max_epoch: 100
 save_path: logs
-initial_model: "logs/best_resnet26_triplet_pretrained_model.model"
+initial_model: "logs/resnet26_arccos/best_model.model"
 test_interval: 1
 
-eval: False
+eval: True
 evaluate:
-  test_list: data/val_pairs.csv
-  test_path: data/val
+  test_list: data/test_blind.csv
+  test_path: data/test_shuffle
   nDataLoaderThread: 5
-output: ""
+output: "last.csv"
 resume: False
 
 loss:
-  name: softmax
+  name: triplet
   params:
     nClasses: 1230 # for softmax related
     nOut: 512
-    margin: 0.3 # for triplet
-    scale: 1
+    margin: 0.4 # for triplet
+    scale: 30
     mining_margin: 0.4
     temperature: 0.1 # for sup contrast
 
@@ -54,8 +54,6 @@ trainer:
     class: CosineAnnealingWarmRestarts
     args:
       T_0: 10
-      T_mult: 1 
+      T_mult: 1
       eta_min: 0.0001
       verbose: True
-  
-

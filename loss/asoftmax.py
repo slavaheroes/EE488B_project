@@ -7,23 +7,29 @@ import torch.nn.functional as F
 import time, pdb, numpy
 
 class LossFunction(nn.Module):
-	def __init__(self, nOut, nClasses, margin, scale, **kwargs):
-	    super(LossFunction, self).__init__()
-
-	    self.m = margin
+    def __init__(self, nOut, nClasses, margin, scale, **kwargs):
+        super(LossFunction, self).__init__()
+        self.m = margin
         self.s = scale
-	    self.fc = nn.Linear(nOut, nClasses, bias = False)
-	    print('Initialised AM Softmax Loss')
+        self.W = torch.nn.Parameter(torch.randn(nOut, nClasses), requires_grad=True)
+        self.ce = nn.CrossEntropyLoss()
+        nn.init.xavier_normal_(self.W, gain=1)
+        print('Initialised AM Softmax Loss')
 
-	def forward(self, x, label=None):
-        for W in self.fc.parameters():
-            W = F.normalize(W, dim=1)
 
-        x = F.normalize(x, dim=1)
+    def forward(self, x, label=None):
+        x = F.relu(x)
 
-        wf = self.fc(x)
-        numerator = self.s * (torch.diagonal(wf.transpose(0, 1)[labels]) - self.m)
-        excl = torch.cat([torch.cat((wf[i, :y], wf[i, y+1:])).unsqueeze(0) for i, y in enumerate(labels)], dim=0)
-        denominator = torch.exp(numerator) + torch.sum(torch.exp(self.s * excl), dim=1)
-        L = numerator - torch.log(denominator)
-        return -torch.mean(L)
+        x_norm = torch.norm(x, p=2, dim=1, keepdim=True).clamp(min=1e-12)
+        x_norm = torch.div(x, x_norm)
+        w_norm = torch.norm(self.W, p=2, dim=0, keepdim=True).clamp(min=1e-12)
+        w_norm = torch.div(self.W, w_norm)
+        costh = torch.mm(x_norm, w_norm)
+        label_view = label.view(-1, 1)
+        if label_view.is_cuda: label_view = label_view.cpu()
+        delt_costh = torch.zeros(costh.size()).scatter_(1, label_view, self.m)
+        if x.is_cuda: delt_costh = delt_costh.cuda()
+        costh_m = costh - delt_costh
+        costh_m_s = self.s * costh_m
+        loss    = self.ce(costh_m_s, label)
+        return loss

@@ -81,7 +81,6 @@ def main():
 
      ## Evaluation code 
     if config["eval"] == True:
-        s.cpu()
         sc, lab, trials = trainer.evaluateFromList(transform=test_transform, **config["evaluate"])
         result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
 
